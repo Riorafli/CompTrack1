@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompTrack — Analytics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-wrap"></div>
+  <main class="main">
+    <div class="topbar"><h1 class="page-title">Analytics & KPIs</h1></div>
+    <div class="content" id="page-content"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+const user = requireAuth(['faculty','superadmin']);
+if (user) {
+  document.getElementById('sidebar-wrap').innerHTML = buildSidebar('analytics.html', user);
+  const competitions = getCompetitions();
+  const byMajor = {};
+  competitions.forEach(c => { byMajor[c.major] = (byMajor[c.major]||0)+1; });
+  const totalFunding = competitions.reduce((s,c) => s+c.funding, 0);
+  const winners = competitions.filter(c => c.achievement?.result==='Winner').length;
+  const completed = competitions.filter(c => c.status==='completed').length;
+  const barData = [4,7,5,9,6,11,8,10,6,8,12,9];
+  const months = ['Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
+  const maxBar = Math.max(...barData);
+
+  document.getElementById('page-content').innerHTML = `
+  <div class="stats-grid">
+    <div class="stat-card blue"><div class="stat-label">Total Competitions</div><div class="stat-value">${competitions.length}</div><div class="stat-sub">All time</div></div>
+    <div class="stat-card green"><div class="stat-label">Winners 🥇</div><div class="stat-value">${winners}</div><div class="stat-sub">First place awards</div></div>
+    <div class="stat-card warn"><div class="stat-label">Total Funding</div><div class="stat-value">${(totalFunding/1e6).toFixed(0)}M</div><div class="stat-sub">IDR requested</div></div>
+    <div class="stat-card teal"><div class="stat-label">Completion Rate</div><div class="stat-value">${Math.round(completed/competitions.length*100)}%</div><div class="stat-sub">Reported achievements</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📈 Monthly Submission Trend</div>
+    <div class="bar-chart" style="height:120px;margin-top:8px">
+      ${barData.map((v,i) => `
+        <div class="bar-wrap">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">${v}</div>
+          <div class="bar" style="height:${(v/maxBar)*100}%" title="${v} submissions"></div>
+          <div class="bar-label">${months[i]}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card">
+      <div class="card-title">Submissions by Major</div>
+      ${Object.entries(byMajor).map(([m,v]) => `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+          <span>${m}</span><span style="color:var(--accent)">${v} submissions</span>
+        </div>
+        <div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${v/competitions.length*100}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px"></div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Funding by Level</div>
+      ${['national','international','regional'].map(lv => {
+        const s = competitions.filter(c=>c.level===lv).reduce((a,c)=>a+c.funding,0);
+        const colors = {national:'var(--accent)',international:'var(--accent2)',regional:'var(--accent3)'};
+        const count = competitions.filter(c=>c.level===lv).length;
+        return `
+        <div style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+            <span style="color:${colors[lv]};text-transform:capitalize">${lv}</span>
+            <span>IDR ${(s/1e6).toFixed(1)}M · ${count} comps</span>
+          </div>
+          <div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${totalFunding?s/totalFunding*100:0}%;background:${colors[lv]};border-radius:3px"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Status Overview</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+      ${['draft','submitted','pic_approved','faculty_approved','completed','pic_rejected'].map(s => {
+        const count = competitions.filter(c=>c.status===s).length;
+        return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center">
+          <div class="stat-value" style="font-size:24px">${count}</div>
+          <div style="margin-top:6px"><span class="status status-${s}">${statusLabel(s)}</span></div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+</script>
+</body>
+</html>

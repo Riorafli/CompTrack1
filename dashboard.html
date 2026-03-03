@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompTrack — Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-wrap"></div>
+  <main class="main">
+    <div class="topbar">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+    <div class="content" id="page-content"></div>
+  </main>
+</div>
+<div id="modal-placeholder"></div>
+<script src="app.js"></script>
+<script>
+const user = requireAuth();
+if (user) {
+  document.getElementById('sidebar-wrap').innerHTML = buildSidebar('dashboard.html', user);
+  document.getElementById('modal-placeholder').innerHTML = MODAL_HTML;
+
+  const role = user.role;
+  const competitions = getCompetitions();
+  const userKey = getUserKey(user);
+  const myComps = role === 'student' ? competitions.filter(c => c.submittedBy === userKey) : competitions;
+  const pending = competitions.filter(c => c.status === 'submitted').length;
+  const picPending = competitions.filter(c => c.status === 'pic_approved').length;
+  const completed = myComps.filter(c => c.status === 'completed').length;
+  const totalFunding = myComps.reduce((s,c) => s + (c.funding||0), 0);
+
+  if (role === 'student') {
+    document.getElementById('topbar-actions').innerHTML =
+      `<a href="submissions.html" class="btn btn-primary btn-sm">+ New Submission</a>`;
+  }
+
+  const barData = [4,7,5,9,6,11,8];
+  const months = ['Jul','Aug','Sep','Oct','Nov','Jan','Feb'];
+  const maxBar = Math.max(...barData);
+
+  document.getElementById('page-content').innerHTML = `
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-label">Total Submissions</div>
+      <div class="stat-value">${myComps.length}</div>
+      <div class="stat-sub">All time</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Completed</div>
+      <div class="stat-value">${completed}</div>
+      <div class="stat-sub">With achievement report</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">Pending PIC</div>
+      <div class="stat-value">${pending}</div>
+      <div class="stat-sub">Awaiting approval</div>
+    </div>
+    ${role !== 'student' ? `<div class="stat-card red">
+      <div class="stat-label">Faculty Pending</div>
+      <div class="stat-value">${picPending}</div>
+      <div class="stat-sub">After PIC approval</div>
+    </div>` : `<div class="stat-card teal">
+      <div class="stat-label">Total Funding</div>
+      <div class="stat-value">${(totalFunding/1e6).toFixed(1)}M</div>
+      <div class="stat-sub">IDR requested</div>
+    </div>`}
+  </div>
+
+  <div class="chart-grid">
+    <div class="mini-chart">
+      <div class="mini-chart-title">📈 Submissions per Month</div>
+      <div class="bar-chart">
+        ${barData.map((v,i) => `
+          <div class="bar-wrap">
+            <div class="bar" style="height:${(v/maxBar)*100}%" title="${v} submissions"></div>
+            <div class="bar-label">${months[i]}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="mini-chart">
+      <div class="mini-chart-title">🌐 Level Distribution</div>
+      <div class="donut-wrap">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="28" fill="none" stroke="#232d45" stroke-width="14"/>
+          <circle cx="40" cy="40" r="28" fill="none" stroke="#4f8aff" stroke-width="14"
+            stroke-dasharray="${.45*175.9} ${175.9}" stroke-dashoffset="${175.9*.25}" transform="rotate(-90 40 40)"/>
+          <circle cx="40" cy="40" r="28" fill="none" stroke="#00d4aa" stroke-width="14"
+            stroke-dasharray="${.3*175.9} ${175.9}" stroke-dashoffset="${-175.9*.2}" transform="rotate(-90 40 40)"/>
+          <circle cx="40" cy="40" r="28" fill="none" stroke="#7c5cfc" stroke-width="14"
+            stroke-dasharray="${.25*175.9} ${175.9}" stroke-dashoffset="${-175.9*.5}" transform="rotate(-90 40 40)"/>
+        </svg>
+        <div class="donut-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#4f8aff"></div><span class="legend-label">National</span><span class="legend-val">45%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#00d4aa"></div><span class="legend-label">Regional</span><span class="legend-val">30%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7c5cfc"></div><span class="legend-label">International</span><span class="legend-val">25%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent Submissions</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Competition</th><th>Level</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${myComps.slice(0,5).map(c => `
+          <tr>
+            <td>
+              <div class="td-main">${c.name}</div>
+              <div style="font-size:11px;color:var(--text3)">${c.id}</div>
+            </td>
+            <td><span class="level-badge level-${c.level}">${c.level}</span></td>
+            <td><span class="status status-${c.status}">${statusLabel(c.status)}</span></td>
+            <td style="color:var(--text3);font-size:12px">${c.submittedAt||'Draft'}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="viewDetail('${c.id}',${JSON.stringify(user).replace(/"/g,'&quot;')})">View</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+</script>
+</body>
+</html>
